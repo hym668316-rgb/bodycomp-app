@@ -101,14 +101,40 @@
   /* 总消耗（含静息）—— 与周计划同口径，界面主推这个 */
   function grossKcal(name, weightKg, minutes) {
     var it = byName(name);
-    if (!it || !minutes) return 0;
-    return Math.round(it.met * (weightKg || 70) * (minutes / 60));
+    if (!it || !minutes || !weightKg) return 0;
+    return Math.round(it.met * weightKg * (minutes / 60));
   }
-  /* 净消耗（额外多烧的）—— 用于加进当天可吃额度 */
+  /* 两个"净"口径，**不能混用**（我第一版混了，验证者抓到）：
+     ① netKcal     = (MET − 1) × kg × h × 1.05        比"躺着不动"多烧多少（仅展示）
+     ② marginalKcal= max(0, MET − 1.5) × kg × h × 1.05 比"平时那样过日子"多烧多少
+        ← **只有 ② 能加进"今天可吃额度"**
+
+     为什么用 1.5 而不是 1：本机额度基线实测是 **PAL 1.5**
+     （derived: tdee_maint 2588 = bmr 1725 × 1.5；我先前在注释里写成 1.2，是错的——
+      PAL 1.2 只用在体测页的 maint_true 显示，与缺口额度无关）。
+     用 ① 的后果不只是每次多算 (1.5−1)×kg×h×1.05 ≈ 32.5 kcal/50min，
+     更严重的是**「久坐 16 小时」这种基线行为会被当成运动加额度**：
+     用 ① 会 +375 kcal，而它对 PAL1.5 的真实边际是 −250 kcal（它还在基线之下）。
+     所以基线类活动必须归零 —— 见 isBaseline()。
+
+     物理依据：1 MET = 3.5 mL O₂/kg/min = 1.05 kcal/kg/h。 */
+  var PAL_BASE = 1.5;
+  var BASELINE_CATS = { "日常": true };
+
+  function isBaseline(name) {
+    var it = byName(name);
+    return !it || !!BASELINE_CATS[it.cat] || it.met <= PAL_BASE;
+  }
   function netKcal(name, weightKg, minutes) {
     var it = byName(name);
-    if (!it || !minutes) return 0;
-    return Math.round((it.met - 1) * (weightKg || 70) * (minutes / 60) * 1.05);
+    if (!it || !minutes || !weightKg) return 0;
+    return Math.round((it.met - 1) * weightKg * (minutes / 60) * 1.05);
+  }
+  function marginalKcal(name, weightKg, minutes) {
+    var it = byName(name);
+    if (!it || !minutes || !weightKg) return 0;
+    if (isBaseline(name)) return 0;
+    return Math.round(Math.max(0, it.met - PAL_BASE) * weightKg * (minutes / 60) * 1.05);
   }
   function totalGross(list, w) {
     return (list || []).reduce(function (a, x) { return a + grossKcal(x.name, w, x.min); }, 0);
@@ -116,9 +142,13 @@
   function totalNet(list, w) {
     return (list || []).reduce(function (a, x) { return a + netKcal(x.name, w, x.min); }, 0);
   }
+  function totalMarginal(list, w) {
+    return (list || []).reduce(function (a, x) { return a + marginalKcal(x.name, w, x.min); }, 0);
+  }
 
   g.ActDB = { items: ITEMS, cats: CATS, byCat: byCat, byName: byName, isKnown: isKnown,
-              needsConfirm: NEEDS_CONFIRM,
+              needsConfirm: NEEDS_CONFIRM, PAL_BASE: PAL_BASE, isBaseline: isBaseline,
+              marginalKcal: marginalKcal, totalMarginal: totalMarginal,
               migrateName: migrateName, aliases: ALIASES,
               grossKcal: grossKcal, netKcal: netKcal,
               totalGross: totalGross, totalNet: totalNet };
