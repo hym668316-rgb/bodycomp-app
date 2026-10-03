@@ -193,6 +193,141 @@
   /* ═══════════ 饮食 ═══════════ */
   function diet(root) {
     var today = S.todayStr(), d = S.day(today), nut = V.nutrition();
+    var I = g.Intake, FOOD = g.FoodDB;
+    var adv = I.advise(today), G = adv.gaps;
+
+    /* ── 1) 实时仪表：目标 / 已吃 / 还差 ── */
+    var head = card("今天吃了多少", "每选一样食物，这里立刻更新");
+    var rows = [
+      ["热量", G.intake.kcal, G.budget.kcal, "kcal", "#0B7A6C"],
+      ["蛋白", G.intake.p, G.budget.p, "g", "#2F6BFF"],
+      ["碳水", G.intake.c, G.budget.c, "g", "#12A594"],
+      ["脂肪", G.intake.f, G.budget.f, "g", "#B87A0A"]
+    ];
+    var tbl = el("table");
+    tbl.innerHTML = "<thead><tr><th>项目</th><th>已吃</th><th>额度</th><th>还差</th><th style='width:34%'>进度</th></tr></thead>";
+    var tb = el("tbody");
+    rows.forEach(function (r) {
+      var gap = Math.round(r[2] - r[1]);
+      var pct = r[2] ? Math.min(150, Math.round(r[1] / r[2] * 100)) : 0;
+      var col = gap < -50 ? "#C4402A" : pct >= 90 ? "#1F7A5C" : "#0B7A6C";
+      var tr = el("tr");
+      tr.innerHTML = "<td><b>" + r[0] + "</b></td><td>" + r[1] + " " + r[3] + "</td><td>" + r[2] + " " + r[3] +
+        "</td><td style='color:" + col + ";font-weight:700'>" + (gap > 0 ? "还差 " + gap : gap < 0 ? "超 " + (-gap) : "刚好") +
+        "</td><td><span class='mb-t' style='display:block'><i style='width:" + Math.min(100, pct) + "%;background:" + r[4] + "'></i></span></td>";
+      tb.appendChild(tr);
+    });
+    tbl.appendChild(tb);
+    head.appendChild(tbl);
+    if (G.burn.gross > 0) {
+      head.appendChild(el("div", "tiny", "今天的运动额度：总消耗 <b>" + G.burn.gross + " kcal</b>，" +
+        "其中额外净消耗 <b>" + G.burn.totalNet + " kcal</b> 已加进上面的额度（避免和静息基线重复计算）。"));
+    }
+    root.appendChild(head);
+
+    /* ── 2) 缺口建议（动态）── */
+    var tipCard = card("还缺什么 / 怎么补", "按你当前吃到的实时算");
+    adv.tips.forEach(function (t) {
+      tipCard.appendChild(el("div", "tiprow " + (t.level === "danger" ? "danger" : t.level === "warn" ? "warn" : "ok"),
+        "<span class='dot'></span><span><b>" + esc(t.label) + "</b> —— " + esc(t.text) + "</span>"));
+    });
+    root.appendChild(tipCard);
+
+    /* ── 3) 四个餐次：点进去选实际吃了什么 ── */
+    I.MEALS.forEach(function (m) {
+      var picked = (I.foodsOf(today)[m.key] || []);
+      var mc = card(m.label, m.hint + (picked.length ? " · 已选 " + picked.length + " 样" : " · 还没选"));
+      /* 已选列表（可调份数 / 删除） */
+      if (picked.length) {
+        var sum = { kcal: 0, p: 0 };
+        picked.forEach(function (sel) {
+          var it = FOOD.get(sel.name) || { kcal: 0, p: 0 };
+          var q = sel.qty || 1;
+          sum.kcal += it.kcal * q; sum.p += it.p * q;
+        });
+        picked.forEach(function (sel) {
+          var it = FOOD.get(sel.name);
+          if (!it) return;
+          var q = sel.qty || 1;
+          var row = el("div", "foodrow");
+          row.appendChild(el("div", "foodrow-l",
+            "<b>" + esc(it.name) + "</b><span class='tiny'>" + it.kcal * q + " kcal · 蛋白 " +
+            Math.round(it.p * q) + "g</span>"));
+          var st = el("div", "qty");
+          var minus = el("button", "qbtn", "−");
+          var num = el("span", "qnum", String(q));
+          var plus = el("button", "qbtn", "+");
+          var del = el("button", "qbtn del", "删");
+          minus.onclick = function () { I.setQty(today, m.key, sel.name, q - 1); g.render(); };
+          plus.onclick = function () { I.setQty(today, m.key, sel.name, q + 1); g.render(); };
+          del.onclick = function () { I.delFood(today, m.key, sel.name); g.render(); };
+          st.appendChild(minus); st.appendChild(num); st.appendChild(plus); st.appendChild(del);
+          row.appendChild(st);
+          mc.appendChild(row);
+        });
+        mc.appendChild(el("div", "tiny", "这一餐合计 <b>" + Math.round(sum.kcal) + " kcal</b> · 蛋白 " +
+          Math.round(sum.p) + " g"));
+      } else {
+        mc.appendChild(el("div", "tiny", "下面点你吃的东西，会自动累加。"));
+      }
+
+      /* 选食物：按分类分组，可折叠 */
+      var picker = el("details", "picker");
+      picker.appendChild(el("summary", null, "＋ 添加食物（" + FOOD.items.length + " 项，按分类）"));
+      FOOD.cats.forEach(function (cat) {
+        var list = FOOD.byCat(cat);
+        if (!list.length) return;
+        picker.appendChild(el("div", "pickcat", "<b>" + cat + "</b>"));
+        var wrap = el("div", "pickwrap");
+        list.forEach(function (it) {
+          var b = el("button", "pickbtn", esc(it.name) +
+            "<span class='pickmac'>" + it.kcal + " kcal · P" + it.p + " C" + it.c + " F" + it.f + "</span>");
+          b.onclick = function () { I.addFood(today, m.key, it.name); g.render(); };
+          wrap.appendChild(b);
+        });
+        picker.appendChild(wrap);
+      });
+      mc.appendChild(picker);
+      root.appendChild(mc);
+    });
+
+    /* ── 4) 保留：方案与速查（折叠，避免刷屏）── */
+    var more = el("details", "picker");
+    more.appendChild(el("summary", null, "早餐方案（三选一）与蛋白来源速查"));
+
+    var bf = D.breakfast || { plans: [] };
+    var bseg = el("div", "seg");
+    bf.plans.forEach(function (p, i) {
+      var b = el("button", "seg-b" + (S.ST().dietPlan === i ? " on" : ""), "方案 " + "ABC"[i]);
+      b.onclick = function () { S.ST().dietPlan = i; S.save(); g.render(); };
+      bseg.appendChild(b);
+    });
+    more.appendChild(bseg);
+    var pick = bf.plans[S.ST().dietPlan] || bf.plans[0];
+    if (pick) {
+      more.appendChild(el("div", "planbox",
+        "<b>" + esc(pick.t) + "</b><span class='pill accent'>" + pick.kcal + " kcal · 蛋白 " + pick.p + " g</span>" +
+        "<ul>" + pick.items.map(function (i) { return "<li>" + esc(i) + "</li>"; }).join("") + "</ul>" +
+        "<div class='tiny'>" + esc(pick.note) + "</div>"));
+    }
+    var pc = el("div");
+    var t2 = el("table");
+    t2.innerHTML = "<thead><tr><th>蛋白来源</th><th>蛋白</th><th>热量</th></tr></thead>";
+    var tb2 = el("tbody");
+    ((D.macros || {}).protein_sources || []).forEach(function (x) {
+      var tr = el("tr");
+      tr.innerHTML = "<td>" + esc(x.food) + "<div class='tiny'>" + esc(x.note) + "</div></td><td><b>" + x.p +
+        " g</b></td><td>" + x.kcal + "</td>";
+      tb2.appendChild(tr);
+    });
+    t2.appendChild(tb2); pc.appendChild(t2);
+    more.appendChild(pc);
+    root.appendChild(more);
+  }
+
+  /* 旧的宏量条组件（仍被其它视图引用，保留） */
+  function dietLegacy(root) {
+    var today = S.todayStr(), d = S.day(today), nut = V.nutrition();
     var head = card("饮食", "目标 " + nut.kcal + " kcal · 蛋白 " + nut.protein + " g");
     head.appendChild(el("div", "macro-bar",
       bar("蛋白", nut.protein_kcal, nut.kcal, "#0B7A6C") +
@@ -288,44 +423,122 @@
       "<span class='mb-t'><i style='width:" + pct + "%;background:" + color + "'></i></span></div>";
   }
 
-  /* ═══════════ 训练 ═══════════ */
+  /* ═══════════ 训练（自由选择，动态消耗）═══════════ */
   function train(root) {
     var today = S.todayStr(), d = S.day(today);
-    var idx = new Date(today + "T00:00:00").getDay();            // 0=周日
+    var I = g.Intake, ACT = g.ActDB;
+    var idx = new Date(today + "T00:00:00").getDay();
     var weekmap = ["周日", "周一", "周二", "周三", "周四", "周五", "周六"];
-    var todayPlan = (D.training || []).filter(function (x) { return x.day === weekmap[idx]; })[0];
+    var refPlan = (D.training || []).filter(function (x) { return x.day === weekmap[idx]; })[0];
+    var B = I.burn(today);
 
-    var head = card("训练", "今天 " + weekmap[idx] + (todayPlan ? " · " + todayPlan.what : ""));
-    if (todayPlan) head.appendChild(el("div", "planbox",
-      "<b>" + esc(todayPlan.what) + "</b><span class='pill accent'>" + todayPlan.min + " 分钟 · 约 " + todayPlan.kcal + " kcal</span>" +
-      "<div class='tiny'>" + esc(todayPlan.why) + "</div>"));
-    var trs = [["力量-推", "力量·推"], ["力量-拉", "力量·拉"], ["力量-腿", "力量·腿"], ["羽毛球", "羽毛球"], ["走/其他有氧", "走/有氧"], ["休息", "休息"]];
-    head.appendChild(el("div", "tiny", "今天实际练了什么（点一下即记录）"));
-    head.appendChild(grid(trs.map(function (x) {
-      return tapRow(x[1], d.train === x[0], function () {
-        S.setDay(today, { train: d.train === x[0] ? "" : x[0] }); g.render();
+    /* ── 1) 今天练了什么（可加多项，不同运动不同时长）── */
+    var head = card("今天练了什么", "自己选，可以加多项：不同运动、不同时长");
+    if (refPlan) {
+      head.appendChild(el("div", "tiny", "（参考：原计划今天一般是「" + esc(refPlan.what) + "」——只是建议，你可以自由换）"));
+    }
+
+    if (B.list.length) {
+      B.list.forEach(function (s, i) {
+        var row = el("div", "foodrow");
+        row.appendChild(el("div", "foodrow-l",
+          "<b>" + esc(s.name) + "</b>" +
+          (s.known ? "" : " <span class='pill danger'>库里没有，按 0 算</span>") +
+          (s.needConfirm ? " <span class='pill warn'>旧记录·强度待确认</span>" : "") +
+          "<span class='tiny'>总消耗 " + s.gross + " kcal · 额外净 " + s.net + " kcal</span>"));
+        var st = el("div", "qty");
+        var minus = el("button", "qbtn", "−5");
+        var num = el("span", "qnum", s.min + "′");
+        var plus = el("button", "qbtn", "+5");
+        var del = el("button", "qbtn del", "删");
+        minus.onclick = function () { I.setSessionMin(today, i, s.min - 5); g.render(); };
+        plus.onclick = function () { I.setSessionMin(today, i, s.min + 5); g.render(); };
+        del.onclick = function () { I.delSession(today, i); g.render(); };
+        st.appendChild(minus); st.appendChild(num); st.appendChild(plus); st.appendChild(del);
+        row.appendChild(st);
+        head.appendChild(row);
       });
-    }), 3));
-    /* 时长 */
-    var dur = el("div", "stepper");
-    var minus = el("button", null, "−"), plus = el("button", null, "+");
-    var val = el("div", "val", (d.trainMin || 0) + " 分钟");
-    minus.onclick = function () { S.setDay(today, { trainMin: Math.max(0, (d.trainMin || 0) - 10) }); g.render(); };
-    plus.onclick = function () { S.setDay(today, { trainMin: Math.min(300, (d.trainMin || 0) + 10) }); g.render(); };
-    dur.appendChild(minus); dur.appendChild(val); dur.appendChild(plus);
-    head.appendChild(dur);
-    root.appendChild(head);
+      head.appendChild(el("div", "rollup",
+        "今日运动合计 <b>" + B.gross + " kcal</b>（总消耗）· 额外净消耗 <b>" + B.totalNet +
+        " kcal</b> <span class='tiny'>· 按体重 " + B.weight + " kg 算</span>"));
+      if (B.needConfirm.length) {
+        head.appendChild(el("div", "warnbox", "有 " + B.needConfirm.length +
+          " 条是旧记录迁移来的，<b>强度不确定</b>（休闲/双打/单打差很多）。删掉重新选一次更准。"));
+      }
+    } else {
+      head.appendChild(el("div", "tiny", "还没记。下面选一项 + 填时长即可，消耗会自动算出来。"));
 
-    /* 一周安排 */
-    var wc = card("一周安排", "点某天看他那天该练什么");
-    (D.training || []).forEach(function (x) {
-      var isToday = x.day === weekmap[idx];
-      var row = el("div", "listrow" + (isToday ? " today" : ""),
-        "<div><b>" + esc(x.day) + "</b> " + esc(x.what) + "</div><div class='tiny'>" + x.min + " 分钟 · " +
-        x.kcal + " kcal</div>");
-      wc.appendChild(row);
-    });
-    root.appendChild(wc);
+      /* ── 2) 添加运动：选项目 + 时长 ── */
+      var form = el("div", "addrow");
+      var sel = el("select", "addsel"); sel.id = "actSel0";
+      ACT.cats.forEach(function (c) {
+        var og = el("optgroup"); og.label = c;
+        ACT.byCat(c).forEach(function (a) {
+          var o = el("option"); o.value = a.name; o.textContent = a.name + "（" + a.met + " MET）";
+          og.appendChild(o);
+        });
+        sel.appendChild(og);
+      });
+      var minIn = el("input", "addmin"); minIn.id = "actMin0";
+      minIn.type = "number"; minIn.value = "45"; minIn.min = "5"; minIn.step = "5"; minIn.inputMode = "numeric";
+      var addBtn = el("button", "addbtn", "加入"); addBtn.id = "actAdd0";
+      form.appendChild(sel); form.appendChild(minIn); form.appendChild(addBtn);
+
+      var preview = el("div", "tiny", "");
+      /* 一律从 DOM 按 id 取元素，不用闭包捕获的引用 ——
+         本页有多个 select（添加运动 / 主项记录），闭包引用在重渲染与多表单下
+         实测取错过，导致名称落库成「哑铃/器械卧推」且消耗算 0。 */
+      function readForm() {
+        var s0 = document.getElementById("actSel0");
+        var m0 = document.getElementById("actMin0");
+        return { name: s0 ? s0.value : "", min: m0 ? (parseInt(m0.value, 10) || 0) : 0 };
+      }
+      function upd() {
+        var f = readForm();
+        var w = B.weight;
+        var g2 = ACT.grossKcal(f.name, w, f.min), n2 = ACT.netKcal(f.name, w, f.min);
+        preview.innerHTML = "按体重 <b>" + w + " kg</b> 估算：总消耗 <b>" + g2 + " kcal</b>，额外净消耗 <b>" +
+          n2 + " kcal</b>（" + f.min + " 分钟）";
+      }
+      sel.onchange = upd; minIn.oninput = upd; upd();
+      addBtn.onclick = function () {
+        var f = readForm();
+        if (!f.name) { toast("先选一项运动"); return; }
+        if (!f.min || f.min < 5) { toast("时长填一下（至少 5 分钟）"); return; }
+        I.addSession(today, f.name, f.min); toast("已加入 " + f.name); g.render();
+      };
+      head.appendChild(form);
+      head.appendChild(preview);
+    }
+    root.appendChild(head);
+    var hasSessions = B.list.length > 0;
+    if (hasSessions) {
+      var add2 = card("再加一项", "比如练完力量又打了球");
+      var form2 = el("div", "addrow");
+      var sel2 = el("select", "addsel"); sel2.id = "actSel1";
+      ACT.cats.forEach(function (c) {
+        var og = el("optgroup"); og.label = c;
+        ACT.byCat(c).forEach(function (a) {
+          var o = el("option"); o.value = a.name; o.textContent = a.name + "（" + a.met + " MET）";
+          og.appendChild(o);
+        });
+        sel2.appendChild(og);
+      });
+      var min2 = el("input", "addmin"); min2.id = "actMin1"; min2.type = "number"; min2.value = "30"; min2.min = "5"; min2.step = "5"; min2.inputMode = "numeric";
+      var addBtn2 = el("button", "addbtn", "加入"); addBtn2.id = "actAdd1";
+      addBtn2.onclick = function () {
+        var s1 = document.getElementById("actSel1");
+        var m1 = document.getElementById("actMin1");
+        var name = s1 ? s1.value : "";
+        var m = m1 ? (parseInt(m1.value, 10) || 0) : 0;
+        if (!name) { toast("先选一项运动"); return; }
+        if (!m || m < 5) { toast("时长填一下"); return; }
+        I.addSession(today, name, m); g.render();
+      };
+      form2.appendChild(sel2); form2.appendChild(min2); form2.appendChild(addBtn2);
+      add2.appendChild(form2);
+      root.appendChild(add2);
+    }
 
     /* 动作细节（选择训练日） */
     var bc = card("动作与组次", "新手版，每周 3 练");
@@ -356,7 +569,7 @@
     var names = [];
     blocks.forEach(function (b) { b.items.forEach(function (it) { names.push(it.name); }); });
     var row = el("div", "row c3");
-    var sel = el("select"); names.forEach(function (n) { var o = el("option", null, n); o.value = n; sel.appendChild(o); });
+    var sel = el("select"); sel.id = "liftSel"; names.forEach(function (n) { var o = el("option", null, n); o.value = n; sel.appendChild(o); });
     var wi = el("input"); wi.type = "number"; wi.placeholder = "kg"; wi.step = "2.5";
     var ri = el("input"); ri.type = "number"; ri.placeholder = "次";
     row.appendChild(sel); row.appendChild(wi); row.appendChild(ri);
