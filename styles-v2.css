@@ -157,3 +157,32 @@
   border-radius:10px;font-family:inherit;font-size:13.5px;font-weight:700;padding:0 14px}
 .addbtn:active{opacity:.85}
 select.addsel, select{max-width:100%}
+
+/* ── 目标卡与档位说明 ── */
+.whybox{margin:8px 0;padding:9px 11px;background:#FFF8EC;border:1px solid #F0DFC0;
+  border-radius:10px;font-size:12.5px;line-height:1.6;color:#6B5320}
+.rulebox{margin:7px 0;padding:8px 10px;background:#F7FAFC;border-left:3px solid var(--accent);
+  border-radius:0 8px 8px 0;font-size:12.5px;line-height:1.6}
+.goalhero{display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;margin:4px 0 8px}
+.goalhero .gv{font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.goalhero .gu{font-size:14px;color:var(--ink2)}
+.goalbar{height:11px;border-radius:6px;background:#E9F1F3;overflow:hidden;margin:8px 0 4px}
+.goalbar i{display:block;height:100%;border-radius:6px;background:linear-gradient(90deg,#12A594,#0B7A6C);
+  transition:width .5s cubic-bezier(.2,.8,.2,1)}
+.goalpick{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:8px 0}
+@media (max-width:380px){ .goalpick{grid-template-columns:1fr} }
+.goalopt{border:1.5px solid var(--line);background:#fff;border-radius:12px;padding:11px 10px;
+  font-family:inherit;text-align:left;display:flex;flex-direction:column;gap:3px}
+.goalopt.on{border-color:var(--accent);background:#EFF8F5;box-shadow:0 0 0 3px rgba(18,165,148,.12)}
+.goalopt b{font-size:15px}
+.goalopt .tiny{line-height:1.45}
+.numrow{display:flex;align-items:center;gap:8px;margin:9px 0}
+.numrow label{flex:0 0 68px;font-size:13.5px;font-weight:600;color:var(--ink2)}
+.numrow input{flex:1;min-width:0;font-size:15px;font-weight:700;text-align:center;padding:9px 6px}
+.numrow .uu{flex:0 0 auto;font-size:13px;color:var(--ink2);min-width:26px}
+.warnbox2{margin:9px 0;padding:9px 11px;background:#FFF3F0;border:1px solid #F3CFC6;
+  border-radius:10px;font-size:12.5px;line-height:1.6;color:#8A2E1C}
+.okbox{margin:9px 0;padding:9px 11px;background:#EFF8F5;border:1px solid #CFE7DF;
+  border-radius:10px;font-size:12.5px;line-height:1.6}
+.mstone{display:flex;justify-content:space-between;padding:6px 0;border-top:1px solid #EEF4F6;font-size:13px}
+.mstone:first-child{border-top:0}
