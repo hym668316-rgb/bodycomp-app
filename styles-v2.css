@@ -120,3 +120,40 @@
 .wbtn:active{background:#E7F4F1}
 .wbtn.save{background:var(--accent);border-color:var(--accent);color:#fff;flex:0 0 auto;padding:0 16px}
 @media (max-width:360px){ .wbtn{padding:0 8px;font-size:12.5px} }
+
+/* ── 食物选择行（饮食板块）── */
+.foodrow{display:flex;align-items:center;gap:8px;padding:8px 0;border-top:1px solid #EEF4F6}
+.foodrow:first-of-type{border-top:0}
+.foodrow-l{flex:1;min-width:0;display:flex;flex-direction:column}
+.foodrow-l b{font-size:14px}
+.qty{display:flex;align-items:center;gap:3px;flex:0 0 auto}
+.qbtn{min-width:34px;height:34px;border:1px solid var(--line);background:#fff;border-radius:9px;
+  font-family:inherit;font-size:13px;font-weight:700;color:var(--accent);padding:0 7px}
+.qbtn:active{background:#E7F4F1}
+.qbtn.del{color:var(--dangerText)}
+.qnum{min-width:34px;text-align:center;font-weight:700;font-size:13.5px;font-variant-numeric:tabular-nums}
+.rollup{margin-top:9px;padding:9px 11px;background:#EFF8F5;border:1px solid #CFE7DF;border-radius:10px;font-size:14px}
+
+/* ── 食物选择器 ── */
+.picker{margin-top:9px;border:1px solid var(--line);border-radius:11px;background:#FCFEFE;padding:0 11px}
+.picker>summary{padding:11px 0;font-size:14px;font-weight:700;color:var(--accent);cursor:pointer;list-style:none}
+.picker>summary::-webkit-details-marker{display:none}
+.picker>summary::before{content:"▸ ";display:inline-block;transition:transform .15s}
+.picker[open]>summary::before{transform:rotate(90deg)}
+.pickcat{margin:9px 0 5px;font-size:12px;color:var(--ink2);border-bottom:1px solid var(--line);padding-bottom:3px}
+.pickwrap{display:grid;grid-template-columns:repeat(2,1fr);gap:6px;margin-bottom:9px}
+@media (max-width:380px){ .pickwrap{grid-template-columns:1fr} }
+.pickbtn{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;
+  border:1px solid var(--line);background:#fff;border-radius:9px;padding:7px 9px;
+  font-family:inherit;font-size:12.5px;font-weight:600;color:var(--ink);line-height:1.35}
+.pickbtn:active{background:#E7F4F1}
+.pickmac{font-size:10.5px;font-weight:500;color:var(--ink2)}
+
+/* ── 添加运动 ── */
+.addrow{display:flex;gap:6px;margin-top:9px}
+.addsel{flex:1 1 auto;min-width:0;font-size:13.5px;padding:9px 8px}
+.addmin{flex:0 0 74px;text-align:center;font-size:14px;font-weight:700;padding:9px 4px}
+.addbtn{flex:0 0 auto;border:1px solid var(--accent);background:var(--accent);color:#fff;
+  border-radius:10px;font-family:inherit;font-size:13.5px;font-weight:700;padding:0 14px}
+.addbtn:active{opacity:.85}
+select.addsel, select{max-width:100%}
