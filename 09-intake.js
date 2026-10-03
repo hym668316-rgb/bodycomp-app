@@ -26,14 +26,16 @@
   /* 汇总当天摄入 */
   function intake(date) {
     var foods = foodsOf(date);
-    var tot = { kcal: 0, p: 0, c: 0, f: 0, items: 0, byMeal: {} };
+    var tot = { kcal: 0, p: 0, c: 0, f: 0, items: 0, byMeal: {}, unknown: [] };
     MEALS.forEach(function (m) {
       var list = foods[m.key] || [];
       var mm = { kcal: 0, p: 0, c: 0, f: 0, n: list.length };
       list.forEach(function (sel) {
         var it = FOOD.get(sel.name);
-        if (!it) return;
-        var q = sel.qty === undefined ? 1 : sel.qty;
+        if (!it) { tot.unknown.push(sel.name); return; }   // 未知食物：报出来，不静默算 0
+        var q = Number(sel.qty);
+        if (!isFinite(q) || q <= 0) q = 1;                 // 防 NaN / 负数 / 0
+        if (q > 20) q = 20;                                // 防 "x 份" 之类算出天文数字
         mm.kcal += it.kcal * q; mm.p += it.p * q; mm.c += it.c * q; mm.f += it.f * q;
         tot.items++;
       });
@@ -45,46 +47,57 @@
   }
 
   /* 当天运动消耗（支持多项）。
-     主推**总消耗**（含静息）—— 它与本机既有周计划里的 kcal 是同口径；
-     净消耗另算，用于加进当天可吃额度。第一版只报净却拿去和总口径的计划值比，是错的。 */
+     加进额度的用 **marginal（比本人 PAL1.5 基线的边际值）**，不是 net（比卧床）。
+     验证者实测过用 net 的后果：只记「久坐 16 小时」会凭空 +375 kcal 额度（真实应为 0 或负）。
+     总消耗（含静息）仍展示，因为"这段时间总共烧了多少"是用户想看的数。 */
   function burn(date) {
     var d = S.day(date);
-    var w = V.latest().weight_kg || 70;
+    var w = V.latest().weight_kg;
+    var badWeight = !(w > 0);
+    if (badWeight) w = 70;
     var list = ((d && d.sessions) || []).slice();
     /* 兼容旧数据：早期只存 d.train / d.trainMin 单项 */
     if (!list.length && d && d.train && d.trainMin) {
       list = [{ name: d.train, min: d.trainMin, legacy: true }];
     }
     var out = list.map(function (x) {
+      var nm = ACT.migrateName(x.name);
+      var min = Number(x.min);
+      if (!isFinite(min) || min < 0) min = 0;              // 防负数/NaN 一路泄漏到界面
+      if (min > 600) min = 600;                            // 防"1e5 分钟"算出 43 万 kcal
       return {
-        name: ACT.migrateName(x.name),
-        rawName: x.name,
-        min: x.min,
-        known: ACT.isKnown(x.name),
-        needConfirm: !!(ACT.aliases[x.name] && ACT.needsConfirm && ACT.needsConfirm[x.name]),
-        gross: ACT.grossKcal(ACT.migrateName(x.name), w, x.min),
-        net: ACT.netKcal(ACT.migrateName(x.name), w, x.min)
+        name: nm, rawName: x.name, min: min,
+        unknown: !ACT.isKnown(x.name),
+        isBaseline: ACT.isBaseline(nm),
+        needConfirm: !!(ACT.needsConfirm && ACT.needsConfirm[x.name]),
+        gross: ACT.grossKcal(nm, w, min),
+        net: ACT.netKcal(nm, w, min),
+        marginal: ACT.marginalKcal(nm, w, min)
       };
     });
     return {
-      list: out,
-      weight: w,
+      list: out, weight: w, badWeight: badWeight,
       gross: out.reduce(function (a, x) { return a + x.gross; }, 0),
       totalNet: out.reduce(function (a, x) { return a + x.net; }, 0),
-      hasUnknown: out.some(function (x) { return !x.known; }),
+      marginal: out.reduce(function (a, x) { return a + x.marginal; }, 0),
+      hasUnknown: out.some(function (x) { return x.unknown; }),
+      baselineOnly: out.length > 0 && out.every(function (x) { return x.isBaseline; }),
       needConfirm: out.filter(function (x) { return x.needConfirm; })
     };
   }
 
-  /* 缺口：目标（路线） − 已摄入；并把训练消耗纳入"可以多吃多少" */
+  /* 缺口：路线目标 − 已摄入；运动只按**边际值**加额度 */
   function gaps(date) {
     var nut = V.nutrition();
     var intk = intake(date);
     var brn = burn(date);
-    /* 有运动的日子，当天可摄入 = 路线目标 + 运动**净**消耗
-       （用净消耗才不会和 PAL 1.2 的静息基线重复计算） */
+    /* 当天可摄入 = 路线目标 + 运动**边际**消耗。
+       基线是 PAL 1.5（实测 derived.tdee_maint/bmr = 2588/1725 = 1.500），
+       所以只有超出 1.5 的那部分才算"额外可吃"；久坐/站立/家务等基线行为边际为 0。
+       先前用 (MET−1)（即假设基线 PAL 1.0）是错的 —— 验证者实测：
+       只记「久坐 16 小时」会虚增 375 kcal 额度。 */
     var budget = {
-      kcal: nut.kcal + brn.totalNet,
+      kcal: nut.kcal + brn.marginal,
       p: nut.protein, c: nut.carb, f: nut.fat
     };
     var gap = {
@@ -134,9 +147,17 @@
     if (G.gap.c < -40) tips.push({ level: "warn", label: "碳水超了 " + Math.abs(G.gap.c) + " g", text: "多半来自米饭/面条/奶茶。主食减半最快。" });
     if (G.gap.f < -15) tips.push({ level: "warn", label: "脂肪超了 " + Math.abs(G.gap.f) + " g", text: "重点查炒菜油、坚果、奶茶。一份炒菜油就是 10 g。" });
 
-    if (G.burn.totalNet > 0) {
-      tips.push({ level: "ok", label: "今日运动净消耗 " + G.burn.totalNet + " kcal",
-        text: "已把这份消耗加进今天可吃的额度（按体重 " + G.burn.weight + " kg 算）。" });
+    if (G.burn.marginal > 0) {
+      tips.push({ level: "ok", label: "运动额外可吃 " + G.burn.marginal + " kcal",
+        text: "按体重 " + G.burn.weight + " kg、相对你的日常基线（PAL " + (ACT.PAL_BASE || 1.5) +
+          "）算出的边际消耗，已加进今天额度。总消耗 " + G.burn.gross + " kcal。" });
+    } else if (G.burn.baselineOnly) {
+      tips.push({ level: "warn", label: "只有日常活动，不加额度",
+        text: "久坐/站立/家务本来就含在日常消耗基线里。要增加可吃额度，请记真正的运动（力量/球类/有氧）。" });
+    }
+    if (G.burn.badWeight) {
+      tips.push({ level: "warn", label: "还没记体重",
+        text: "运动消耗暂按 70 kg 估算。去「首页」记一次体重，这里立刻变准。" });
     }
     if (!G.intake.items) {
       tips.unshift({ level: "warn", label: "今天还没记吃的", text: "点上面的餐次，选你实际吃了什么；选完这里会实时算缺口。" });
@@ -150,7 +171,7 @@
     var list = (foods[mealKey] || []).slice();
     var hit = null;
     for (var i = 0; i < list.length; i++) if (list[i].name === name) hit = list[i];
-    if (hit) hit.qty = (hit.qty || 1) + 1;
+    if (hit) hit.qty = Math.min(20, (hit.qty || 1) + 1);
     else list.push({ name: name, qty: 1 });
     foods[mealKey] = list;
     S.setDay(date, { foods: foods });
@@ -169,7 +190,12 @@
   function addSession(date, name, min) {
     var d = S.day(date);
     var list = ((d && d.sessions) || []).slice();
-    list.push({ name: name, min: min || 30 });
+    /* 闸门：验证者实测 addSession(-120) 会存负数、addSession(0) 会静默变 30、
+       时长 1e5 会算出 43 万 kcal。这里统一夹到 5–600 分钟。 */
+    var m = parseInt(min, 10);
+    if (!isFinite(m) || m <= 0) m = 30;
+    m = Math.max(5, Math.min(600, m));
+    list.push({ name: name, min: m });
     /* 同步旧的单向字段，保持周报/兼容逻辑可用 */
     S.setDay(date, { sessions: list, train: list[0].name, trainMin: list.reduce(function (a, x) { return a + (x.min || 0); }, 0) });
   }
