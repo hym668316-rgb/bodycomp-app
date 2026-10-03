@@ -179,9 +179,15 @@
     var d = card("数据");
     d.appendChild(el("div", "tiny", "打卡 " + Object.keys(S.ST().logs).length + " 天 · 体测导入 " +
       Object.keys(S.ST().readings).length + " 次 · 主项 " + (S.ST().lifts || []).length + " 条"));
-    var eb = el("button", "btn", "导出备份（复制 / 分享）");
-    eb.onclick = exportData; d.appendChild(eb);
-    var ib = el("button", "btn ghost", "从剪贴板导入");
+    var eb = el("button", "btn primary", "① 下载备份文件（推荐）");
+    eb.onclick = exportFile; d.appendChild(eb);
+    var eb2 = el("button", "btn", "② 复制备份内容");
+    eb2.onclick = exportData; d.appendChild(eb2);
+    d.appendChild(el("div", "tiny",
+      "备份文件会存成 <b>体成分记录-备份-日期.json</b>。iOS/安卓长期不打开这个 App，" +
+      "系统可能清掉本地数据 —— <b>把文件存进 iCloud/网盘，就等于永久保住了记录</b>，" +
+      "换手机也能用它恢复。"));
+    var ib = el("button", "btn ghost", "从备份恢复（粘贴内容）");
     ib.onclick = importData; d.appendChild(ib);
     var cb = el("button", "btn ghost", "清空全部数据");
     cb.onclick = function () { if (confirm("清空全部记录？不可撤销。")) { S.reset(); g.toast("已清空"); g.render(); } };
@@ -219,6 +225,29 @@
     var SH = g.Capacitor && g.Capacitor.Plugins && g.Capacitor.Plugins.Share;
     if (SH) SH.share({ title: "体成分记录备份", text: txt, dialogTitle: "导出" }).catch(function () { fallbackCopy(txt); });
     else fallbackCopy(txt);
+  }
+
+  /* 一键下载成备份文件（.json）。
+     比"复制到剪贴板"更抗丢失：文件可以存进 iCloud/网盘/发给自己，
+     而剪贴板内容容易被后续复制冲掉。iOS 长期不打开会清站点数据，
+     所以"有一个落地的文件"是这条链路上最关键的一环。 */
+  function exportFile() {
+    try {
+      var txt = JSON.stringify(S.exportObj(), null, 1);
+      var stamp = S.todayStr().replace(/-/g, "");
+      var name = "体成分记录-备份-" + stamp + ".json";
+      var blob = new Blob([txt], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url; a.download = name;
+      document.body.appendChild(a); a.click();
+      setTimeout(function () { document.body.removeChild(a); URL.revokeObjectURL(url); }, 1500);
+      S.ST().lastExportAt = new Date().toISOString(); S.save();
+      toast("已导出 " + name + "（" + Math.round(txt.length / 1024) + " KB）");
+      g.render();
+    } catch (e) {
+      toast("导出文件失败，改用「复制备份」：" + String(e).slice(0, 40));
+    }
   }
   function fallbackCopy(txt) {
     if (navigator.clipboard) navigator.clipboard.writeText(txt)
@@ -274,6 +303,13 @@
   S.load();
   if (S.ST().firstRun) { S.ST().firstRun = false; S.save(); }
   g.FX.installRipple();
+  /* 页面被隐藏/切到后台时强制存一次盘。
+     iOS Safari 在切后台时可能挂起页面，未落盘的改动会丢；
+     打卡是"点一下就想保住"的操作，所以这里补一道保险。 */
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState === "hidden") { try { S.save(); } catch (e) {} }
+  });
+  window.addEventListener("pagehide", function () { try { S.save(); } catch (e) {} });
   window.addEventListener("resize", function () {
     if (S.ST().tab === "report" || S.ST().tab === "home") render();
   });
