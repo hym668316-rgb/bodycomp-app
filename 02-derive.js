@@ -76,17 +76,35 @@
     var bf = (D.target && D.target.bodyfat_pct) || 16;
     return +(lean / (1 - bf / 100)).toFixed(1);
   }
-  /* 营养目标：随路线与去脂体重变化 */
+  /* 营养目标：**优先用用户设定的目标**（体脂/体重/肌肉量 + 期限 → 动态算缺口与配比）；
+     没设目标时回退到固定路线（plans A–D）。
+     这样「目标可变」才真的改变每天该吃多少，而不只是显示一个数字。 */
   function nutrition() {
     var p = currentPlan(), cur = latest();
     var lean = cur.lean_kg || (D.derived && D.derived.lean_kg) || 54.6;
+
+    /* ① 有目标：用目标引擎算出的方案 */
+    var GM = g.Goal;
+    if (GM && GM.hasGoal && GM.hasGoal()) {
+      var c = GM.compute();
+      if (c && c.ok) {
+        return {
+          kcal: c.kcal, protein: c.protein, fat: c.fat, carb: c.carb,
+          protein_kcal: c.protein * 4, fat_kcal: c.fat * 9, carb_kcal: c.carb * 4,
+          planId: "目标", planTitle: c.label + " " + c.start + "→" + c.target + c.unit,
+          src: "goal", goal: c
+        };
+      }
+    }
+
+    /* ② 没目标：回退到固定路线 */
     var protein = Math.round(2.0 * lean);                 // 减脂期取 2.0 g/kg 去脂体重
     var kcal = p.kcal;
     var fat = Math.round(kcal * 0.28 / 9);
     var carb = Math.round((kcal - protein * 4 - fat * 9) / 4);
     return { kcal: kcal, protein: protein, fat: fat, carb: carb,
              protein_kcal: protein * 4, fat_kcal: fat * 9, carb_kcal: carb * 4,
-             planId: p.id, planTitle: p.title };
+             planId: p.id, planTitle: p.title, src: "plan" };
   }
 
   /* ── 报告文字解析 ── */
