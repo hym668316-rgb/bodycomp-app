@@ -50,6 +50,17 @@
       root.appendChild(fresh);
     }
 
+    /* ── 目标：有目标显示进度；有体测数据但还没设目标 → 出现可选项 ──
+       用户要求「第一次给出身体数据后出现可选项」，所以门槛是 hasReadings()。 */
+    var GUI = g.GoalUI, GL = g.Goal;
+    if (GUI && GL) {
+      if (GL.hasGoal()) {
+        GUI.progressCard(root);
+      } else if (V.hasReadings()) {
+        GUI.picker(root);
+      }
+    }
+
     /* ── 主视觉：今日完成度大环 ── */
     var hero = el("div", "hero");
     var heroL = el("div", "hero-l");
@@ -563,34 +574,69 @@
       root.appendChild(add2);
     }
 
-    /* 动作细节（选择训练日） */
-    var bc = card("动作与组次", "新手版，每周 3 练");
-    var blocks = (D.training_blocks || {}).days || [];
-    var seg = el("div", "seg");
-    blocks.forEach(function (b, i) {
-      var btn = el("button", "seg-b" + (S.ST().trainPlan === i ? " on" : ""), b.d);
-      btn.onclick = function () { S.ST().trainPlan = i; S.save(); g.render(); };
-      seg.appendChild(btn);
+    /* 动作与组次：三档（新手 / 进阶 / 高手），每档不同分化 */
+    var TDB = g.TrainDB;
+    var lvlKey = S.ST().trainLevel || "beginner";
+    var L = TDB.byKey(lvlKey);
+
+    var bc = card("动作与组次", L.label + "档 · " + L.split + " · 每周 " + L.perWeek + " 练");
+    /* 档位切换 */
+    var lseg = el("div", "seg");
+    TDB.levels.forEach(function (x) {
+      var on = x.key === lvlKey;
+      var b = el("button", "seg-b" + (on ? " on" : ""), x.label);
+      b.onclick = function () {
+        S.ST().trainLevel = x.key; S.ST().trainPlan = 0; S.save(); g.render();
+      };
+      lseg.appendChild(b);
     });
-    bc.appendChild(seg);
-    var blk = blocks[S.ST().trainPlan] || blocks[0];
+    bc.appendChild(lseg);
+    bc.appendChild(el("div", "tiny", "<b>" + esc(L.sub) + "</b> · " + esc(L.split) +
+      " · 每次约 " + L.min + " 分钟 · 组间休息 " + esc(L.rest)));
+    bc.appendChild(el("div", "whybox", esc(L.why)));
+
+    /* 训练日切换 */
+    var dseg = el("div", "seg");
+    L.days.forEach(function (x, i) {
+      var b = el("button", "seg-b" + (S.ST().trainPlan === i ? " on" : ""), x.d);
+      b.onclick = function () { S.ST().trainPlan = i; S.save(); g.render(); };
+      dseg.appendChild(b);
+    });
+    bc.appendChild(dseg);
+
+    var blk = L.days[S.ST().trainPlan] || L.days[0];
     if (blk) {
+      bc.appendChild(el("div", "tiny", "训练日重点：<b>" + esc(blk.focus) + "</b>"));
       var t = el("table");
-      t.innerHTML = "<thead><tr><th>动作</th><th>组×次</th></tr></thead>";
+      t.innerHTML = "<thead><tr><th>动作</th><th>组×次</th><th>做不动时</th></tr></thead>";
       var tb = el("tbody");
       blk.items.forEach(function (it) {
         var tr = el("tr");
-        tr.innerHTML = "<td><b>" + esc(it.name) + "</b><div class='tiny'>" + esc(it.cue) + "</div></td><td>" + esc(it.sets) + "</td>";
+        tr.innerHTML = "<td><b>" + esc(it.name) + "</b><div class='tiny'>" + esc(it.cue) + "</div></td>" +
+          "<td style='white-space:nowrap'><b>" + esc(it.sets) + "</b></td>" +
+          "<td class='tiny'>" + esc(it.alt || "—") + "</td>";
         tb.appendChild(tr);
       });
       t.appendChild(tb); bc.appendChild(t);
     }
+    /* 训练纪律（折叠） */
+    var rl = el("details", "picker");
+    rl.appendChild(el("summary", null, "训练纪律（" + TDB.rules.length + " 条，三档通用）"));
+    var ul = el("div");
+    TDB.rules.forEach(function (x) {
+      ul.appendChild(el("div", "rulebox", esc(x).replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")));
+    });
+    rl.appendChild(ul);
+    bc.appendChild(rl);
     root.appendChild(bc);
+    var blocks = blk ? [blk] : [];
 
-    /* 主项记录 */
-    var lc = card("主项记录", "判断「有没有掉肌肉」的唯一基准");
+    /* 主项记录：列出**当前档位的全部动作**（方便记任何一天的动作） */
+    var lc = card("主项记录", "判断「有没有掉肌肉」的唯一基准 —— 减脂期这个数别掉");
     var names = [];
-    blocks.forEach(function (b) { b.items.forEach(function (it) { names.push(it.name); }); });
+    TDB.byKey(lvlKey).days.forEach(function (b) {
+      b.items.forEach(function (it) { if (names.indexOf(it.name) < 0) names.push(it.name); });
+    });
     var row = el("div", "row c3");
     var sel = el("select"); sel.id = "liftSel"; names.forEach(function (n) { var o = el("option", null, n); o.value = n; sel.appendChild(o); });
     var wi = el("input"); wi.type = "number"; wi.placeholder = "kg"; wi.step = "2.5";
@@ -618,13 +664,6 @@
       t3.appendChild(tb3); lc.appendChild(t3);
     }
     root.appendChild(lc);
-
-    /* 训练纪律 */
-    var rc = card("训练纪律");
-    rc.appendChild(el("div", null, ((D.training_blocks || {}).rules || []).map(function (r) {
-      return "<div class='tip'>· " + r.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>") + "</div>";
-    }).join("")));
-    root.appendChild(rc);
   }
 
   /* ═══════════ 补剂 ═══════════ */
