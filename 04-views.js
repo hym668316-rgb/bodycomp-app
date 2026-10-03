@@ -671,7 +671,9 @@
     var today = S.todayStr(), d = S.day(today);
     var items = (D.supplements || {}).items || [];
     var must = S.mustSupps();
-    var cats = ["基础必需", "值得买", "可选", "不建议"];
+    /* 分类顺序：**「你在吃的」放最前** —— 那是你当前的方案，先看它；
+       后面几类是"建议清单"，用来对比和扩充。 */
+    var cats = ["你在吃的", "基础必需", "值得买", "可选", "不建议"];
 
     var head = card("补剂", "每天必吃 " + must.length + " 项 · 今日已勾 " + Object.keys(d.sup || {}).length);
     var seg = el("div", "seg");
@@ -708,7 +710,7 @@
       if (!list.length) return;
       var c = card(cat + "（" + list.length + " 项）");
       list.forEach(function (x) {
-        var cls = cat === "基础必需" ? "ok" : cat === "值得买" ? "accent" : cat === "可选" ? "warn" : "danger";
+        var cls = cat === "你在吃的" ? "accent" : cat === "基础必需" ? "ok" : cat === "值得买" ? "accent" : cat === "可选" ? "warn" : "danger";
         c.appendChild(el("div", "planbox",
           "<b>" + esc(x.name) + "</b> <span class='pill " + cls + "'>" + cat + "</span>" +
           (x.must ? " <span class='pill ok'>每天必吃</span>" : "") +
