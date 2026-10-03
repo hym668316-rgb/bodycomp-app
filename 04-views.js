@@ -219,9 +219,23 @@
     });
     tbl.appendChild(tb);
     head.appendChild(tbl);
-    if (G.burn.gross > 0) {
-      head.appendChild(el("div", "tiny", "今天的运动额度：总消耗 <b>" + G.burn.gross + " kcal</b>，" +
-        "其中额外净消耗 <b>" + G.burn.totalNet + " kcal</b> 已加进上面的额度（避免和静息基线重复计算）。"));
+    if (G.burn.list.length) {
+      var bnote = "今天的运动：总消耗 <b>" + G.burn.gross + " kcal</b>。";
+      if (G.burn.marginal > 0) {
+        bnote += "其中比日常（PAL 1.5 基线）多烧的 <b>" + G.burn.marginal + " kcal</b> 已加进上面的额度。";
+      } else if (G.burn.baselineOnly) {
+        bnote += "你记的都是<b>日常活动</b>（久坐/站立/家务）—— 它们本就含在日常基线里，" +
+          "<b>不额外加额度</b>，否则等于把「坐着」当成运动。";
+      }
+      head.appendChild(el("div", "tiny", bnote));
+    }
+    if (G.intake.unknown && G.intake.unknown.length) {
+      head.appendChild(el("div", "warnbox", "有 <b>" + G.intake.unknown.length + " 样食物不在库里</b>，" +
+        "已跳过不计：<b>" + esc(G.intake.unknown.join("、")) + "</b>。它们的热量没有算进上面的摄入。"));
+    }
+    if (G.burn.badWeight) {
+      head.appendChild(el("div", "warnbox", "还没记体重，运动消耗暂按 70 kg 估算。" +
+        "去「首页」记一次体重，这里会立刻变准。"));
     }
     root.appendChild(head);
 
@@ -443,9 +457,10 @@
         var row = el("div", "foodrow");
         row.appendChild(el("div", "foodrow-l",
           "<b>" + esc(s.name) + "</b>" +
-          (s.known ? "" : " <span class='pill danger'>库里没有，按 0 算</span>") +
+          (s.unknown ? " <span class='pill danger'>库里没有，按 0 算</span>" : "") +
           (s.needConfirm ? " <span class='pill warn'>旧记录·强度待确认</span>" : "") +
-          "<span class='tiny'>总消耗 " + s.gross + " kcal · 额外净 " + s.net + " kcal</span>"));
+          "<span class='tiny'>总消耗 " + s.gross + " kcal" +
+          (s.isBaseline ? " · 日常活动，不加额度" : " · 额外可吃 " + s.marginal + " kcal") + "</span>"));
         var st = el("div", "qty");
         var minus = el("button", "qbtn", "−5");
         var num = el("span", "qnum", s.min + "′");
@@ -459,8 +474,13 @@
         head.appendChild(row);
       });
       head.appendChild(el("div", "rollup",
-        "今日运动合计 <b>" + B.gross + " kcal</b>（总消耗）· 额外净消耗 <b>" + B.totalNet +
+        "今日运动合计 <b>" + B.gross + " kcal</b>（总消耗）· 可多吃 <b>" + B.marginal +
         " kcal</b> <span class='tiny'>· 按体重 " + B.weight + " kg 算</span>"));
+      if (B.baselineOnly) {
+        head.appendChild(el("div", "warnbox",
+          "你记的都是<b>日常活动</b>（久坐/站立/家务/通勤骑车）—— 这些本身就含在日常消耗基线里，" +
+          "<b>不会增加今天可吃的额度</b>。要加额度，请记真正的运动（力量/球类/有氧）。"));
+      }
       if (B.needConfirm.length) {
         head.appendChild(el("div", "warnbox", "有 " + B.needConfirm.length +
           " 条是旧记录迁移来的，<b>强度不确定</b>（休闲/双打/单打差很多）。删掉重新选一次更准。"));
@@ -496,9 +516,12 @@
       function upd() {
         var f = readForm();
         var w = B.weight;
-        var g2 = ACT.grossKcal(f.name, w, f.min), n2 = ACT.netKcal(f.name, w, f.min);
-        preview.innerHTML = "按体重 <b>" + w + " kg</b> 估算：总消耗 <b>" + g2 + " kcal</b>，额外净消耗 <b>" +
-          n2 + " kcal</b>（" + f.min + " 分钟）";
+        var g2 = ACT.grossKcal(f.name, w, f.min);
+        var mg = ACT.marginalKcal(f.name, w, f.min);
+        var base = ACT.isBaseline(f.name);
+        preview.innerHTML = "按体重 <b>" + w + " kg</b> 估算：总消耗 <b>" + g2 + " kcal</b>，" +
+          (base ? "<b>日常活动，不增加可吃额度</b>" : "额外可吃 <b>" + mg + " kcal</b>") +
+          "（" + f.min + " 分钟）";
       }
       sel.onchange = upd; minIn.oninput = upd; upd();
       addBtn.onclick = function () {
