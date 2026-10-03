@@ -83,16 +83,28 @@
     var p = currentPlan(), cur = latest();
     var lean = cur.lean_kg || (D.derived && D.derived.lean_kg) || 54.6;
 
-    /* ① 有目标：用目标引擎算出的方案 */
+    /* ① 有目标：用目标引擎算出的方案。
+       注意**重组方案要单独走 recComp()** —— 它吃的是"维持热量"，与
+       compute() 按体脂目标反推缺口是两套算法。早先统一走 compute()，
+       结果按钮显示 2588、进度卡显示 2442，同一个方案出现两个数（实测抓到）。 */
     var GM = g.Goal;
     if (GM && GM.hasGoal && GM.hasGoal()) {
-      var c = GM.compute();
+      var g0 = GM.goal();
+      var c;
+      if (g0 && g0.kind === "recomp" && GM.recComp) {
+        c = GM.recComp(g0.tier, g0.weeks);
+      } else {
+        c = GM.compute();
+      }
       if (c && c.ok) {
         return {
           kcal: c.kcal, protein: c.protein, fat: c.fat, carb: c.carb,
           protein_kcal: c.protein * 4, fat_kcal: c.fat * 9, carb_kcal: c.carb * 4,
-          planId: "目标", planTitle: c.label + " " + c.start + "→" + c.target + c.unit,
-          src: "goal", goal: c
+          planId: g0 && g0.kind === "recomp" ? "重组" : "目标",
+          planTitle: (g0 && g0.kind === "recomp")
+            ? (c.name + " · " + c.weeks + " 周")
+            : (c.label + " " + c.start + "→" + c.target + c.unit),
+          src: "goal", goal: c, kind: g0 ? g0.kind : null
         };
       }
     }
