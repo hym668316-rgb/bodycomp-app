@@ -14,7 +14,7 @@ END:STANDARD
 END:VTIMEZONE
 BEGIN:VEVENT
 UID:bodycomp-daily-20261003@localhost
-DTSTAMP:20261003T060307Z
+DTSTAMP:20261003T115403Z
 DTSTART;TZID=Asia/Shanghai:20261003T210000
 DURATION:PT10M
 RRULE:FREQ=DAILY;INTERVAL=1
@@ -23,6 +23,8 @@ DESCRIPTION:30 秒完成今天的记录：\n1) 体重（晨起空腹排
  空后最准）\n2) 训练（休息日也点一下，才有对比）\n
  3) 蛋白达标（一勺蛋白粉 + 2 个蛋 ≈ 38g）\n4) 补剂 5 
  项（D3 / 镁 / 鱼油 / 乳清 / 肌酸）\n\n
+打开：https://hym6
+ 68316-rgb.github.io/bodycomp-app/
 BEGIN:VALARM
 TRIGGER:-PT0M
 ACTION:DISPLAY
