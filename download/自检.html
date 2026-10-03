@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#07564C">
+<title>真机自检 · 体成分记录</title>
+<style>
+:root{--bg:#F4F9FA;--ink:#12303A;--ink2:#4A6B75;--line:#DCE7EA;--accent:#0B7A6C;--ok:#1F7A5C;--warn:#8A5A0B;--danger:#A8321C}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:"Microsoft YaHei","PingFang SC",system-ui,sans-serif;font-size:16px;line-height:1.65}
+.wrap{max-width:680px;margin:0 auto;padding:14px 12px 44px}
+.hero{background:linear-gradient(135deg,#07564C,#0A6B5E 52%,#0D7A6A);color:#fff;border-radius:18px;padding:16px;margin-bottom:12px;box-shadow:0 10px 26px rgba(7,86,76,.28)}
+.hero h1{margin:0 0 4px;font-size:19px}
+.hero p{margin:0;font-size:13px;opacity:.95}
+.prog{display:flex;align-items:center;gap:10px;margin-top:10px}
+.prog .bar{flex:1;height:9px;background:rgba(255,255,255,.28);border-radius:999px;overflow:hidden}
+.prog .bar i{display:block;height:100%;width:0;background:#fff;border-radius:999px;transition:width .3s ease}
+.prog .n{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.card{background:#fff;border:1px solid var(--line);border-radius:14px;padding:6px 12px 12px;margin-bottom:11px;box-shadow:0 1px 2px rgba(18,48,58,.05)}
+.card h2{font-size:15.5px;margin:12px 0 8px;padding-left:10px;position:relative}
+.card h2::before{content:"";position:absolute;left:0;top:3px;bottom:3px;width:3px;border-radius:2px;background:linear-gradient(180deg,#12A594,#0B7A6C)}
+.item{display:flex;gap:11px;align-items:flex-start;padding:11px 0;border-top:1px solid #EEF4F6;cursor:pointer}
+.item:first-of-type{border-top:0}
+.item .box{flex:0 0 24px;width:24px;height:24px;border:2px solid var(--line);border-radius:7px;margin-top:1px;
+  display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;color:#fff;transition:all .15s}
+.item.done .box{background:var(--accent);border-color:var(--accent)}
+.item .txt{flex:1;min-width:0}
+.item .t{display:block;font-size:14.5px;font-weight:700;line-height:1.45}
+.item.done .t{text-decoration:line-through;color:var(--ink2);font-weight:600}
+.item .x{display:block;font-size:12.5px;color:var(--ink2);margin-top:3px;line-height:1.55}
+.item .bad{display:none;font-size:12.5px;color:var(--danger);margin-top:4px;line-height:1.5}
+.item.fail .bad{display:block}
+.acts{display:flex;gap:8px;margin-top:10px}
+button{font-family:inherit;font-size:14px;font-weight:700;border-radius:11px;padding:11px 14px;border:1px solid var(--line);
+  background:#fff;color:var(--ink2);flex:1}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.tip{font-size:13px;padding:10px 12px;border-radius:10px;margin-top:8px}
+.tip.warn{background:#FBF3E2;border:1px solid #F0E0BE;color:#6B470A}
+.tip.danger{background:#FBEDEA;border:1px solid #F2D6D0;color:#8A2A17}
+.tip.ok{background:#EFF8F5;border:1px solid #CFE7DF;color:#155C46}
+code{background:#EEF4F6;padding:1px 5px;border-radius:4px;font-size:13px;word-break:break-all}
+.failbtn{font-size:11.5px;font-weight:600;color:var(--danger);background:none;border:0;padding:2px 0;text-decoration:underline;flex:0 0 auto}
+a.big{display:block;text-align:center;background:var(--accent);color:#fff;text-decoration:none;border-radius:12px;padding:13px;font-weight:700;font-size:15.5px;margin-top:10px}
+h3{font-size:15px;margin:14px 0 6px}
+details{border-top:1px solid #EEF4F6;padding:9px 0}
+details:first-of-type{border-top:0}
+summary{font-size:14px;font-weight:700;cursor:pointer;color:var(--ink)}
+details p{font-size:13px;color:var(--ink2);margin:6px 0 0}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="hero">
+    <h1>真机自检 · 12 条</h1>
+    <p>拿着手机一条条试，勾掉一条少一条。打勾会存在本机，关掉页面再回来还在。</p>
+    <div class="prog"><span class="n" id="pn">0/12</span><span class="bar"><i id="pb"></i></span></div>
+  </div>
+
+  <div class="card">
+    <h2>① 通道与安装（1–5）</h2>
+    <div id="list1"></div>
+  </div>
+
+  <div class="card">
+    <h2>② 记录功能（6–9）</h2>
+    <div id="list2"></div>
+  </div>
+
+  <div class="card">
+    <h2>③ 数据与提醒（10–12）</h2>
+    <div id="list3"></div>
+    <div class="acts">
+      <button class="primary" id="reset">全部重来</button>
+      <button id="allok">全部标为通过</button>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>出问题了？对号入座</h2>
+    <details><summary>手机打不开那个地址 / 一直转圈</summary>
+      <p>1) 确认手机和电脑连的是<b>同一个 Wi-Fi</b>（不是手机流量）。<br>
+      2) 确认电脑上双击过 <code>启动.cmd</code>，且那两个黑窗口还开着。<br>
+      3) 有些路由器开了「客户端隔离 / AP 隔离」，会禁止设备互访 —— 换成手机热点让电脑连上试。<br>
+      4) 电脑换了网络（比如插了网线/换了 Wi-Fi），IP 可能变了：在电脑上跑 <code>ipconfig</code> 看新的 IPv4 地址。</p></details>
+    <details><summary>浏览器一直提示「不安全 / 连接不是私密连接」</summary>
+      <p>证书没装或没装对。重装一次，关键是<b>凭据用途必须选「VPN 和应用」</b>（选成 "WLAN" 不生效）。<br>
+      实在不想装：点「高级 → 继续访问」也能用，但浏览器可能拒绝离线功能。</p></details>
+    <details><summary>菜单里找不到「添加到桌面」</summary>
+      <p>不同浏览器叫法不一样：Chrome/Edge 叫「安装应用」，华为/小米浏览器叫「添加到桌面」，有的在「更多工具」里。<br>
+      如果确实没有：说明这个浏览器不支持 PWA 安装 —— 换 Chrome 或 Edge 试。功能本身不受影响，照样能用。</p></details>
+    <details><summary>打卡数据不见了</summary>
+      <p>两个常见原因：<br>
+      1) 你换了访问地址（比如从公网隧道换回局域网 IP）—— <b>浏览器把不同地址当成不同网站</b>，数据不互通。<br>
+      2) 清过浏览器的「站点数据 / 清除缓存」。<br>
+      补救：如果你导出过备份，在设置里「从剪贴板导入」恢复。所以<b>定期导出很重要</b>，App 会在 14 天没导出时提醒你。</p></details>
+    <details><summary>日历提醒没响</summary>
+      <p>1) 确认 .ics 真的导入了（打开日历 App 看 21:00 有没有那条）。<br>
+      2) 检查日历 App 有没有通知权限。<br>
+      3) 手机「省电模式 / 后台限制」可能拦住日历提醒，把日历 App 加进白名单。</p></details>
+    <details><summary>OCR 少识别了几项（蛋白质 / 去脂体重 / 骨量）</summary>
+      <p>这是<b>已知情况</b>，不是坏了：秤 App 的截图里这几项的<b>中文标签被左侧图标干扰</b>，OCR 把它读成了乱码
+      （实测「蛋白质」→ <code>san</code>、「骨量」→ <code>#2</code>），数字其实读对了但配不上标签。<br>
+      脚本会主动问你这几项，手边有读数就填，没有就跳过 —— <b>不猜</b>。</p></details>
+  </div>
+
+  <a class="big" href="../index.html">← 回到 App</a>
+  <a class="big" style="background:#fff;color:var(--accent);border:1px solid var(--accent)" href="index.html">下载页（证书 / 日历 / apk）</a>
+
+</div>
+
+<script>
+(function () {
+  var KEY = "bodycomp_selfcheck_v1";
+  var ITEMS = [
+    ["打开下载页", "手机浏览器打开 本页地址（download/） ，能看到三个下载项", "检查是否同一 Wi-Fi、电脑上「启动.cmd」是否在跑"],
+    ["装好证书", "设置 → 安全 → 更多安全设置 里能看到「用户凭据」（凭据用途选了「VPN 和应用」）", "重装一次，务必选「VPN 和应用」"],
+    ["https 不报警告", "打开 本站首页 没有「不安全」提示", "证书没装对，见下面「一直提示不安全」"],
+    ["添加到桌面", "桌面出现「体成分」图标，点开无地址栏", "换 Chrome / Edge 试，或在菜单的「更多工具」里找"],
+    ["开飞行模式还能打开", "断网后从桌面图标进入，页面正常显示", "Service Worker 没生效 —— 确认是 https 地址且没清过站点数据"],
+    ["一键打卡有反应", "首页点「蛋白达标」，按钮变绿、圆环上涨、数字滚动", "换更现代的浏览器（Chrome / Edge / 较新版华为浏览器）"],
+    ["记录会保存", "杀掉浏览器重新打开，刚才的勾选还在", "浏览器清了站点数据，或你换了访问地址"],
+    ["训练能记录", "训练 → 点「力量·推」+ 调时长，首页训练环变成 2/2", "—"],
+    ["报表能画图", "报表页三张图都画出来，还有环比表", "老旧 WebView 可能不支持 canvas，报我看"],
+    ["导出备份成功", "设置 → 导出备份，弹出复制/分享", "如果没弹，多试一次；或用「从剪贴板导入」旁的提示"],
+    ["日历提醒导入了", "日历 App 里能看到每天 21:00 的「体成分记录 · 打卡」", "用日历 App 打开那个 .ics 文件，别用文本编辑器"],
+    ["体测导入能解析", "设置 → 体测与趋势 → 粘贴文本 → 出现数字预览和确认按钮", "文字格式要含「体重」「体脂率」等标签"]
+  ];
+
+  var state = {};
+  try { state = JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { state = {}; }
+  var failed = {};
+  try { failed = JSON.parse(localStorage.getItem(KEY + "_fail") || "{}"); } catch (e) { failed = {}; }
+
+  function save() {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(state));
+      localStorage.setItem(KEY + "_fail", JSON.stringify(failed));
+    } catch (e) {}
+  }
+  function render() {
+    for (var g = 1; g <= 3; g++) {
+      var box = document.getElementById("list" + g);
+      if (!box) continue;
+      box.innerHTML = "";
+      var from = (g - 1) * 4, to = Math.min(from + 4, ITEMS.length);
+      for (var i = from; i < to; i++) {
+        (function (idx) {
+          var it = ITEMS[idx];
+          var d = document.createElement("div");
+          d.className = "item" + (state[idx] ? " done" : "") + (failed[idx] ? " fail" : "");
+          d.innerHTML =
+            '<span class="box">' + (state[idx] ? "✓" : "") + "</span>" +
+            '<span class="txt"><span class="t">' + (idx + 1) + ". " + it[0] + "</span>" +
+            '<span class="x">' + it[1] + "</span>" +
+            '<span class="bad">✗ ' + it[2] + "</span></span>";
+          d.onclick = function (e) {
+            if (e.target.classList.contains("failbtn")) return;
+            state[idx] = !state[idx];
+            if (state[idx]) failed[idx] = false;
+            save(); render();
+          };
+          box.appendChild(d);
+        })(i);
+      }
+    }
+    var n = 0;
+    for (var k in state) if (state[k]) n++;
+    document.getElementById("pn").textContent = n + "/" + ITEMS.length;
+    document.getElementById("pb").style.width = (n / ITEMS.length * 100) + "%";
+  }
+  document.getElementById("reset").onclick = function () {
+    state = {}; failed = {}; save(); render();
+  };
+  document.getElementById("allok").onclick = function () {
+    for (var i = 0; i < ITEMS.length; i++) state[i] = true;
+    failed = {}; save(); render();
+  };
+  render();
+  window.__checkReady = true;
+})();
+</script>
+</body>
+</html>
